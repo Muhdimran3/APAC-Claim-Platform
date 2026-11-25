@@ -31,6 +31,12 @@ app:
   kafka:
     topics:
       claim-events: claim-events
+  outbox:
+    batch-size: 100
+    send-timeout-ms: 5000
+    poller:
+      enabled: true
+      interval-ms: 500
 
 server:
   port: 8080

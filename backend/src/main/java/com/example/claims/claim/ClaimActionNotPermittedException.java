@@ -1,9 +1,10 @@
 package com.example.claims.claim;
 
+import com.example.claims.common.web.ApiExceptions.ForbiddenException;
 import com.example.claims.user.Role;
 
 /** The caller's role may never perform this action. Maps to HTTP 403 Forbidden. */
-public class ClaimActionNotPermittedException extends RuntimeException {
+public class ClaimActionNotPermittedException extends ForbiddenException {
 
     private final ClaimAction action;
     private final Role role;

@@ -150,3 +150,50 @@ Real authentication/IdP, document uploads, approval authority limits, FX convers
   - Left the V1 placeholder untouched. It's already applied in the local DB, and editing it would break Flyway's checksum.
   - Seed data lives in a Flyway migration (demo only).
 - **Verified:** `mvnw verify` passes 77 tests with 0 failures. Against the compose DB, Flyway migrated v1→v4 and the app started.
+
+### Entry 5 - Step 3: domain services, outbox, REST API
+- **Prompt / Direction:** Implement entities and services for the core tables with ownership/assignment rules, the transactional outbox writer + seq-ordered poller (stop the batch on first failure), and the REST endpoints with `X-User` → DB role lookup and 403/409/validation responses. Add tests.
+- **Built:**
+  - `user`: `AppUser`, `CurrentUser`, and `CurrentUserArgumentResolver`, which reads `X-User`, looks up the user, and takes the role from the DB (401 if missing or unknown). Also `GET /api/me` and `GET /api/users/officers` (for the manager's assign picker).
+  - `policy`: read-only `Policy`; `GET /api/policies` returns a claimant's own policies, or all for staff.
+  - `claim`:
+    - Entities reference each other **by ID, not `@ManyToOne`** (aggregate boundaries, no lazy-loading surprises).
+    - `Claim` owns every state change and routes it through `ClaimLifecycle`. Approve sets reserve = approved amount; reject and settle release the reserve to 0 and set `closedAt`.
+    - `ClaimAccess` enforces ownership and assignment. Check order is view (404) → role/assignment (403) → state (409) → business rule (422).
+    - Separate `ClaimCommandService` (writes) and `ClaimQueryService` (direct reads).
+    - The controller exposes one endpoint per command, and each returns the updated detail including `availableActions`.
+  - `outbox`:
+    - `OutboxWriter` uses `@Transactional(propagation = MANDATORY)`, so it throws if called outside the claim's transaction.
+    - `OutboxPoller` locks the next batch with `FOR UPDATE SKIP LOCKED ORDER BY seq` and waits for each Kafka ack before marking a row published. On the first failure it records `attempts`/`last_error` and stops the batch.
+    - `OutboxPollerScheduler` runs every 500 ms, can be disabled by property, and is off in tests.
+  - `common.web`: API exception types + RFC 7807 `ProblemDetail` handler. 400 includes `errors` by field; optimistic-lock conflicts → 409.
+  - OpenAPI: `X-User` is documented as an API-key header, so Swagger UI's Authorize button works.
+- **Key decisions:**
+  - **Another claimant's claim returns 404, not 403**, so claim IDs can't be probed for existence. Staff can view any claim, but only the assignee (or a manager) can act on it.
+  - **One `/assign` endpoint:** on a SUBMITTED claim it's an assignment (officer self pick-up, or a manager naming an officer). On an open, already-assigned claim it's a manager-only reassignment with no status change.
+  - **One event per command.** Approve, reject and settle also move the reserve, but don't emit a separate `ReserveChanged`. The event's snapshot carries the new reserve, and `reserve_change` still records the audit row.
+  - **`claimVersion` = JPA `@Version` after `saveAndFlush`**, so each claim's events are numbered 0, 1, 2, …, which is what projections will use to drop stale or duplicate events.
+  - **Claimants never see** `reserveAmount`, `reserveHistory` or `notes` (internal estimates and staff notes). Those fields are omitted from the JSON, not sent as null.
+  - **Business rules (422):** incident date inside the policy period; claimed/reserve/approved amount ≤ sum insured; settlement ≤ approved amount.
+  - **Kafka value is the JSON string** with String serializers, avoiding Jackson 2-vs-3 serializer config in spring-kafka. Consumers parse the envelope themselves.
+- **Challenged / corrected during the build:**
+  - AI first put the Spring Data repositories as nested interfaces in one file. Spring Data doesn't scan nested repositories by default, so they were split into top-level files before the first run.
+  - AI left a dead placeholder method in `ClaimCommandService`. It was removed.
+  - AI first checked sum insured *before* the lifecycle transition, so a claim in the wrong state with a large amount got 422 instead of 409. The order was flipped so 409 comes first, and a later 422 still rolls everything back (covered by a test).
+  - A Step 2 test (`SchemaMigrationTest`) counted every claim row. It broke once other test classes shared the DB, so it now counts by ID.
+  - Test failure traced to Spring 7 `jsonPath().value(List.of(...))`, which converts to the runtime class of the expected value (an internal immutable JDK list) and yields `null`. Switched to Hamcrest `contains(...)`. The API response was correct all along; I verified it by printing the response.
+  - `getFirst()`/`getLast()` are Java 21 APIs and the project targets 17. Replaced them with index access.
+- **Known limits (not fixed, deliberately):**
+  - Multiple app instances could break per-claim ordering, because SKIP LOCKED lets two pollers take different batches at once. Fine for one instance; for more, one poller would need to be elected leader, or rows split by claimId hash. Documented in `OutboxPoller`.
+  - Holding a DB transaction while waiting for Kafka acks is acceptable at 100 rows × 5 s timeout. At higher volume, mark rows "in flight" first and send outside the transaction.
+  - No pagination on `GET /api/claims` (demo data volume).
+  - `jsonb` normalises key order, so the Kafka payload isn't byte-identical to what was written (semantically identical).
+  - An empty POST sent with a non-JSON `Content-Type` (PowerShell's default) gets 415. Clients that send JSON or no content type are fine.
+- **Verified:**
+  - `mvnw verify` passes **126 tests, 0 failures**:
+    - lifecycle 69 + entity 8 + access 8 (unit)
+    - poller 4 (unit with mocked Kafka)
+    - API 25 (MockMvc + Postgres)
+    - outbox 4 (Postgres + real Kafka)
+    - schema 7 and context 1
+  - Manual smoke test on the docker-compose stack, with the scheduled poller on: submitted and assigned a claim over HTTP, both outbox rows marked published, and both messages are on `claim-events` keyed by claimId.

@@ -43,8 +43,10 @@ class SchemaMigrationTest {
 
     @Test
     void submittedClaimWithoutOfficerIsAccepted() {
-        insertClaim(UUID.randomUUID(), "SUBMITTED", null);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM claim", Integer.class)).isEqualTo(1);
+        UUID id = UUID.randomUUID();
+        insertClaim(id, "SUBMITTED", null);
+        // Count by id: other test classes share this database and may have committed claims.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM claim WHERE id = ?", Integer.class, id)).isEqualTo(1);
     }
 
     @Test
