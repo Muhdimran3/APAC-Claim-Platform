@@ -1,0 +1,68 @@
+<main class="page">
+  <section>
+    <h1 class="display">Report an<br /><span class="light">Incident</span></h1>
+    <div class="muted small subtitle">Choose the policy, then tell us what happened. You can track the claim straight away.</div>
+  </section>
+
+  @if (session.isStaff()) {
+    <div class="note">Only claimants report incidents. The backend rejects this for staff with 403.</div>
+  }
+
+  <form class="bento" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <section class="card accent">
+      <h2 class="card-title">1 · Policy</h2>
+      @if (policies(); as list) {
+        @if (list.length === 0) {
+          <div class="muted">No policies found for this user.</div>
+        }
+        <div class="policies" role="radiogroup" aria-label="Policy">
+          @for (p of list; track p.id) {
+            <label class="policy" [class.selected]="form.controls.policyId.value === p.id">
+              <input type="radio" formControlName="policyId" [value]="p.id" />
+              <span class="spread"><strong>{{ p.policyNumber }}</strong><span class="pill">{{ p.market }} · {{ p.product }}</span></span>
+              <span class="small">Sum insured <strong class="num">{{ p.sumInsured | money: p.currency }}</strong></span>
+              <span class="small muted">Cover {{ p.effectiveFrom | day }} – {{ p.effectiveTo | day }} · {{ p.currency }}</span>
+            </label>
+          }
+        </div>
+      } @else if (!problem()) {
+        <div class="muted">Loading policies…</div>
+      }
+      @if (serverError('policyId'); as err) { <div class="field-error on-accent">{{ err }}</div> }
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">2 · What happened</h2>
+      <div class="form">
+        <div class="field">
+          <label for="incidentDate">Incident date</label>
+          <input id="incidentDate" class="input" type="date" formControlName="incidentDate" [max]="today"
+                 [min]="selected()?.effectiveFrom ?? ''"
+                 [class.invalid]="(form.controls.incidentDate.touched && form.controls.incidentDate.invalid) || serverError('incidentDate')" />
+          @if (serverError('incidentDate'); as err) { <div class="field-error">{{ err }}</div> }
+          @else if (form.controls.incidentDate.touched && form.controls.incidentDate.invalid) { <div class="field-error">Required</div> }
+        </div>
+        <div class="field">
+          <label for="description">Description</label>
+          <textarea id="description" class="textarea" rows="4" formControlName="description"
+                    placeholder="e.g. Rear-ended at traffic lights on Orchard Road"
+                    [class.invalid]="(form.controls.description.touched && form.controls.description.invalid) || serverError('description')"></textarea>
+          @if (serverError('description'); as err) { <div class="field-error">{{ err }}</div> }
+          @else if (form.controls.description.touched && form.controls.description.invalid) { <div class="field-error">Required</div> }
+        </div>
+        <div class="field">
+          <label for="claimedAmount">Amount claimed{{ selected() ? ' (' + selected()!.currency + ')' : '' }}</label>
+          <input id="claimedAmount" class="input num" type="number" min="0.01" step="0.01" formControlName="claimedAmount"
+                 [class.invalid]="(form.controls.claimedAmount.touched && form.controls.claimedAmount.invalid) || serverError('claimedAmount')" />
+          @if (serverError('claimedAmount'); as err) { <div class="field-error">{{ err }}</div> }
+          @else if (form.controls.claimedAmount.touched && form.controls.claimedAmount.invalid) { <div class="field-error">Enter an amount above zero</div> }
+          @if (selected(); as p) { <div class="small muted">Up to {{ p.sumInsured | money: p.currency }} (sum insured)</div> }
+        </div>
+      </div>
+      <app-problem-alert [problem]="problem()" />
+      <div class="row">
+        <button class="btn" type="submit" [disabled]="submitting()">{{ submitting() ? 'Submitting…' : 'Submit claim' }}</button>
+      </div>
+    </section>
+  </form>
+</main>

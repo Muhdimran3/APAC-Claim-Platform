@@ -1,0 +1,5 @@
+.inline { display: grid; gap: 10px; background: var(--card-soft); border-radius: 18px; padding: 14px; }
+.inline .btn { justify-self: start; }
+.two { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.quote { font-size: 14px; color: var(--ink-2); border-left: 3px solid var(--lime); padding-left: 10px; }
+.flash { background: var(--lime-soft); border-radius: 12px; padding: 8px 12px; }

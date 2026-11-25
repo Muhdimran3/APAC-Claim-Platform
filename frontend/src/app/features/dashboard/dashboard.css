@@ -1,0 +1,16 @@
+.hero { align-items: flex-end; }
+.subtitle { margin-top: 10px; }
+.title-xl { font-size: 38px; line-height: 1; font-weight: 800; letter-spacing: -0.02em; }
+.title-xl .light { font-weight: 400; }
+.r { text-align: right; }
+.exposure { gap: 18px; }
+.ctab { border: 0; cursor: pointer; border-radius: var(--radius-pill); padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 650; background: rgba(255, 255, 255, 0.16); color: #fff; display: inline-flex; gap: 8px; align-items: baseline; }
+.ctab span { font-weight: 400; font-size: 13px; }
+.ctab[aria-selected='true'] { background: var(--lime); color: var(--ink); }
+.big { font-size: clamp(38px, 5vw, 64px); letter-spacing: -0.04em; line-height: 1.05; margin: 4px 0 10px; }
+.breakdown { background: var(--accent-soft); color: var(--ink); border-radius: var(--radius-lg); padding: 18px; display: grid; gap: 12px; }
+.breakdown .muted { color: var(--muted); }
+.line { display: grid; gap: 6px; }
+.workload { grid-column: span 2; }
+.warn { color: #c2410c; font-weight: 700; }
+@media (max-width: 760px) { .workload { grid-column: auto; } }

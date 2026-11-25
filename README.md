@@ -10,7 +10,7 @@ Local-only claims management platform (take-home assessment). Claimants and clai
 |---|---|
 | `docker-compose.yml` | PostgreSQL 16 + Kafka 4.1 (KRaft, single node); optional kafka-ui |
 | `backend/` | Spring Boot 4.2 service (`claims-service`), Java 17 target |
-| `frontend/` | Angular app (later step) |
+| `frontend/` | Angular 21 app "APAC Claims Workbench" (claimant + staff), proxies `/api` to :8080 |
 | `AI_JOURNAL.md` | Log of AI prompts, what was accepted, challenged and overridden |
 
 ## Prerequisites
@@ -18,6 +18,7 @@ Local-only claims management platform (take-home assessment). Claimants and clai
 - Docker Desktop (running)
 - JDK 17+ (tested on Temurin 25). `JAVA_HOME` must point at a real JDK.
 - Maven is **not** required, because the backend ships with the Maven Wrapper.
+- Node.js 20.19+, 22.12+ or 24+ (tested on 24.12) for the frontend.
 
 ## Run
 
@@ -30,10 +31,18 @@ docker compose --profile tools up -d
 # 2. Backend
 cd backend
 .\mvnw.cmd spring-boot:run
+
+# 3. Frontend (second terminal)
+cd frontend
+npm install
+npm start            # http://localhost:4200, /api proxied to http://localhost:8080
 ```
+
+Pick a demo user in the top-right switcher (sent as the `X-User` header): `alice` / `ben` (claimants), `olivia` / `oscar` (officers), `maya` (manager), or `mallory` to see a 401.
 
 | URL | |
 |---|---|
+| http://localhost:4200 | the app |
 | http://localhost:8080/actuator/health | health (db status included) |
 | http://localhost:8080/swagger-ui.html | API docs / try-it |
 | http://localhost:8080/v3/api-docs | OpenAPI JSON (source for frontend client types) |
@@ -43,6 +52,10 @@ cd backend
 ```powershell
 cd backend
 .\mvnw.cmd verify    # uses Testcontainers (own Postgres + Kafka), so compose doesn't need to be running
+
+cd ..\frontend
+npm run build                # production build
+npx ng test --watch=false    # Vitest unit tests
 ```
 
 ## Configuration

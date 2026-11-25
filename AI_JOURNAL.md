@@ -232,3 +232,33 @@ Real authentication/IdP, document uploads, approval authority limits, FX convers
     - workload 5, exposure 4, timeline 2 (Postgres, synthetic duplicate/stale/replayed events)
     - end-to-end 2: REST → outbox → poller → Kafka → three groups → endpoints, plus role checks
   - Smoke test on compose: V5 applied, three groups each got all 3 partitions, and the dashboards and timeline returned correct data built by replay.
+
+### Entry 7 - Step 5: Angular frontend ("APAC Claims Workbench")
+- **Prompt / Direction:** Build the Angular app in `frontend/` against the real backend, using a bento layout inspired by a supplied HTML design reference (light-grey canvas, rounded white cards, one cobalt accent card, lime/neutral pills, tabular numbers, pure CSS). Role-aware tabs, a demo user switcher sending `X-User` via an interceptor, a dev proxy to :8080, RFC 7807 errors, claims list with filters and "needing attention", submit form, detail page with allowed-action inline forms, Kafka-fed timeline with manual Refresh, workload and per-currency exposure dashboards.
+- **Accepted from the design reference:** visual language only (palette, radii, pill colours, layout rhythm, big display headings, currency tabs with in-currency bars).
+- **Overrode / did not copy from the reference:**
+  - **Its brand name** ("Insuriva"): the app is "APAC Claims Workbench" with a neutral mark.
+  - **Its domain model:** USD/EUR/GBP, US/DE/UK markets, statuses like `IN_ASSESSMENT`/`DECIDED`, a "reserve required before decide" rule, and hard-coded baseline exposure numbers. Everything now comes from our API and our 7 statuses.
+  - **Its simulated outbox/projection lag** (setTimeout and a fake offset counter). The timeline uses a real `GET …/timeline` with a manual Refresh. For staff it shows "Catching up: N of M events" by comparing the projected event count with the claim's real version.
+  - **Google Fonts.** System font stack instead, so the app makes no external requests (strictly local).
+- **Key decisions:**
+  - **Angular 21.2 (LTS), not 22.** Angular 22 needs Node ≥ 24.15 and the machine has 24.12. Rather than force a Node upgrade mid-sprint, I used the newest major that supports the installed Node. Upgrading later is a routine `ng update`.
+  - **Identity:** `CurrentUser` holds only the selected username (no dependencies, so the interceptor can read it without a DI cycle). `userInterceptor` adds `X-User` to `/api/*` calls only. **Role and display name come from `GET /api/me`.** No request body ever contains a role (asserted in a unit test).
+  - **No stale data across user switches:** `<router-outlet>` only renders once `/api/me` has resolved, so switching user destroys and rebuilds the current page. A page can't show the previous user's data, and pages don't need to watch the selection. `Session` uses `switchMap`, so a slow `/api/me` for the old user is dropped.
+  - **No client-side role guards.** Routes aren't guarded; the API's 403/404 is rendered as a problem card. The UI can't drift from the server's rules, and the enforcement is visible in a demo (e.g. switch to `ben` on Alice's claim and you get the 404 page with an explanation).
+  - **Action buttons:** lifecycle actions come only from the server's `availableActions`. Reserve / note / reassign aren't lifecycle actions, so the UI derives them from the documented rules (manager: any claim; officer: assigned only; reserve only while open). The server still enforces them; this only hides buttons that would 403. Covered by `action-panel.spec.ts`.
+  - **Claimant view:** reserve, reserve history and notes render only if present in the JSON, and the backend omits them for claimants. The list's officer/claimant columns are hidden for claimants.
+  - **Money:** `Intl.NumberFormat` with `currencyDisplay: 'code'` ("SGD 2,400.00"), because `$` is ambiguous across SGD/HKD/AUD. Exposure is shown one currency at a time, and bars are scaled within that currency so IDR never visually dwarfs SGD.
+  - **Errors:** one `toProblem()` normalises every failure (including status 0, "backend unreachable"). `ProblemAlert` shows status, title, detail, a one-line hint per status, and 400 field errors. The submit form also maps field errors back under each input.
+  - **State:** signals throughout, OnPush components, lazy-loaded pages (initial transfer ≈ 78 kB). Plain HttpClient + signals instead of the newer resource APIs, which are simpler to read and defend.
+- **Challenged / corrected during the build:**
+  - The first `ng new` with Angular 22 failed on the Node engine check, so I switched to 21.2.
+  - The README edit via a chained shell heredoc half-applied (line-ending mismatch). Redone with explicit edits.
+- **Known limits:**
+  - **I couldn't visually check the UI in this session** (no browser tool). It's verified by build, unit tests, and HTTP checks through the dev proxy.
+  - There are no end-to-end browser tests.
+  - `GET /api/me` also returns a derived `staff` boolean (Jackson serialises `CurrentUser.isStaff()`). It's harmless and ignored by the UI.
+- **Verified:**
+  - `npm run build`: clean, no warnings, no budget breaches.
+  - `ng test`: **29 Vitest tests pass**, covering the interceptor (header, follows selection, no role in body), problem parsing, money formatting, action-button rules per role/assignment, attention rules, per-currency exposure bars, and the problem alert rendering field errors.
+  - With the backend on compose and `ng serve`: the page title is right, `/api/me` resolves through the proxy (maya → MANAGER), an unknown user gets 401, and an officer requesting exposure gets 403.

@@ -1,0 +1,45 @@
+<header class="topbar">
+  <a class="brand" routerLink="/claims" aria-label="APAC Claims Workbench home">
+    <span class="mark" aria-hidden="true"><span></span></span>
+    <span>APAC Claims <span class="light">Workbench</span></span>
+  </a>
+
+  <nav class="tabs" aria-label="Main">
+    @for (t of tabs(); track t.path) {
+      <a [routerLink]="t.path" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: t.exact }">{{ t.label }}</a>
+    }
+  </nav>
+
+  <div class="switcher" role="group" aria-label="Demo user (sent as X-User)">
+    <span class="mono label">X-User</span>
+    @for (u of users; track u.username) {
+      <button type="button" [attr.aria-pressed]="u.username === username()" (click)="select(u.username)">
+        <span class="mono">{{ u.username }}</span>
+        <span class="hint">{{ u.hint }}</span>
+      </button>
+    }
+  </div>
+</header>
+
+<div class="whoami small">
+  @if (session.me(); as me) {
+    Signed in as <strong>{{ me.displayName }}</strong> · role <span class="mono">{{ me.role }}</span>
+    <span class="muted">(resolved by the backend from X-User)</span>
+  } @else if (session.loading()) {
+    <span class="muted">Resolving user…</span>
+  }
+</div>
+
+@if (session.problem(); as p) {
+  <main class="page">
+    <section class="card unauth">
+      <div class="big num">{{ p.status || '—' }}</div>
+      <div class="card-title">{{ p.status === 401 ? 'We couldn’t identify you' : 'Can’t reach the API' }}</div>
+      <app-problem-alert [problem]="p" />
+      <p class="muted small">Pick one of the seeded users above. The backend looks up the role for the X-User
+        header and returns no claim data for unknown users.</p>
+    </section>
+  </main>
+} @else if (session.me()) {
+  <router-outlet />
+}

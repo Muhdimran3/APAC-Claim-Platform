@@ -1,0 +1,8 @@
+.hero { align-items: flex-end; }
+.subtitle { margin-top: 10px; }
+.attention { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.att { text-align: left; border: 0; cursor: pointer; font: inherit; color: var(--ink); background: #fff; border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.att:hover { outline: 3px solid var(--lime); }
+.att .muted { color: var(--muted); }
+.att-id { font-size: 16px; font-weight: 650; }
+.att .pill { align-self: flex-start; }

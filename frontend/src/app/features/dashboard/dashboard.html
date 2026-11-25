@@ -1,0 +1,109 @@
+<main class="page">
+  <section class="spread hero">
+    <div>
+      <h1 class="display">{{ session.isManager() ? 'Workload &' : 'My' }}<br /><span class="light">{{ session.isManager() ? 'Exposure' : 'Workload' }}</span></h1>
+      <div class="muted small subtitle">
+        From Kafka-fed read models (eventually consistent){{ workload() ? ' · generated ' + (workload()!.generatedAt | when) : '' }}
+      </div>
+    </div>
+    <button type="button" class="btn ghost" (click)="refresh()">Refresh</button>
+  </section>
+
+  <app-problem-alert [problem]="workloadProblem()" />
+
+  <div class="bento">
+    @if (session.isManager()) {
+      <section class="card accent exposure">
+        <div class="spread">
+          <h2 class="title-xl">Open<br /><span class="light">Exposure</span></h2>
+          <div class="mono muted r">exposure-projection<br />per currency · never converted</div>
+        </div>
+        <app-problem-alert [problem]="exposureProblem()" />
+        @if (exposure(); as d) {
+          @if (currencies().length) {
+            <div class="chips" role="tablist" aria-label="Currency">
+              @for (t of currencies(); track t.currency) {
+                <button type="button" role="tab" class="ctab" [attr.aria-selected]="t.currency === currency()" (click)="currency.set(t.currency)">
+                  {{ t.currency }} <span class="num">{{ t.outstandingReserve | money: t.currency : true }}</span>
+                </button>
+              }
+            </div>
+            @if (selectedTotal(); as t) {
+              <div>
+                <div class="small">Outstanding reserves on open claims · {{ t.currency }} only</div>
+                <div class="big num">{{ t.outstandingReserve | money: t.currency }}</div>
+                <div class="row">
+                  <span class="pill">{{ t.openClaims }} open claims</span>
+                  <span class="pill lime">{{ t.unreservedClaims }} open with no reserve yet</span>
+                </div>
+              </div>
+              <div class="breakdown">
+                <div class="spread"><strong>Market × product</strong><span class="small">{{ t.currency }}</span></div>
+                @for (b of bars(); track b.label) {
+                  <div class="line">
+                    <div class="spread small"><span>{{ b.label }} <span class="muted">· {{ b.openClaims }} open</span></span><strong class="num">{{ b.amount | money: t.currency }}</strong></div>
+                    <div class="bar"><span [style.width.%]="b.pct"></span></div>
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+            <div>No open claims, so no outstanding exposure.</div>
+          }
+        } @else if (!exposureProblem()) {
+          <div>Loading exposure…</div>
+        }
+      </section>
+    }
+
+    <section class="card workload">
+      <div class="spread">
+        <div>
+          <h2 class="card-title">Workload</h2>
+          <div class="mono muted">workload-projection</div>
+        </div>
+        @if (workload(); as w) {
+          <span class="pill lime num">{{ w.unassigned.open }} unassigned</span>
+        }
+      </div>
+      @if (workload(); as w) {
+        <div class="row small muted">
+          <span>Unassigned queue: <strong class="num">{{ w.unassigned.aged }}</strong> open &gt; {{ w.agedAfterDays }} days</span>
+          <span>· oldest {{ w.unassigned.oldestSubmittedAt | day }}</span>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Officer</th><th class="r">Assigned</th><th class="r">Assessing</th><th class="r">Awaiting info</th><th class="r">Approved</th>
+                <th class="r">Open</th><th class="r">&gt;{{ w.agedAfterDays }}d</th><th>Oldest open</th>
+                <th class="r">Closed {{ w.performanceWindowDays }}d</th><th class="r">Avg days to close</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (o of w.officers; track o.officerId) {
+                <tr>
+                  <td><strong>{{ o.displayName }}</strong></td>
+                  <td class="r num">{{ o.openByStatus['ASSIGNED'] }}</td>
+                  <td class="r num">{{ o.openByStatus['UNDER_ASSESSMENT'] }}</td>
+                  <td class="r num">{{ o.openByStatus['AWAITING_INFO'] }}</td>
+                  <td class="r num">{{ o.openByStatus['APPROVED'] }}</td>
+                  <td class="r num"><strong>{{ o.open }}</strong></td>
+                  <td class="r num" [class.warn]="o.aged > 0">{{ o.aged }}</td>
+                  <td class="num">{{ o.oldestOpenSubmittedAt | day }}</td>
+                  <td class="r num">{{ o.closedInWindow }}</td>
+                  <td class="r num">{{ o.avgDaysToClose === null ? '—' : o.avgDaysToClose.toFixed(1) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (session.role() === 'OFFICER') {
+          <div class="note">Officers see their own row. Managers see every officer.</div>
+        }
+      } @else if (!workloadProblem()) {
+        <div class="skeleton">Loading workload…</div>
+      }
+    </section>
+  </div>
+</main>

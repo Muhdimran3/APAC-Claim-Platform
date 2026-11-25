@@ -1,0 +1,95 @@
+<main class="page">
+  <section class="spread hero">
+    <div>
+      @if (session.isClaimant()) {
+        <h1 class="display">My<br /><span class="light">Claims</span></h1>
+      } @else {
+        <h1 class="display">Claims<br /><span class="light">Operations</span></h1>
+      }
+      <div class="muted small subtitle">{{ today.toDateString() }} · read directly from the claim records (always current)</div>
+    </div>
+    <div class="row">
+      @for (s of stats(); track s.label) {
+        <div class="tile"><div class="small muted">{{ s.label }}</div><div class="value">{{ claims() ? s.value : '–' }}</div></div>
+      }
+      @if (session.isClaimant()) {
+        <a class="btn" routerLink="/claims/new">Report an incident</a>
+      }
+    </div>
+  </section>
+
+  <app-problem-alert [problem]="problem()" />
+
+  @if (attention().length) {
+    <section class="card accent">
+      <div class="spread">
+        <h2 class="card-title">Claims needing attention</h2>
+        <span class="small muted">{{ attention().length }} in this view · oldest first</span>
+      </div>
+      <div class="attention">
+        @for (a of attention(); track a.claim.id) {
+          <button type="button" class="att" (click)="open(a.claim)">
+            <span class="spread"><span class="small muted">{{ a.claim.submittedAt | day }}</span><app-status-pill [status]="a.claim.status" /></span>
+            <span class="att-id">{{ a.claim.claimNumber }}</span>
+            <span class="small">{{ a.claim.policy.market }} · {{ a.claim.policy.product }}</span>
+            <span class="pill lime">{{ a.reason }}</span>
+          </button>
+        }
+      </div>
+    </section>
+  }
+
+  <section class="card">
+    <div class="spread">
+      <h2 class="card-title">{{ session.isClaimant() ? 'All my claims' : 'Claims' }}</h2>
+      @if (session.isStaff()) {
+        <div class="chips" role="group" aria-label="Assignee">
+          <button type="button" class="chip" [attr.aria-pressed]="assignee() === 'me'" (click)="setAssignee('me')">Assigned to me</button>
+          <button type="button" class="chip" [attr.aria-pressed]="assignee() === 'unassigned'" (click)="setAssignee('unassigned')">Unassigned</button>
+          <button type="button" class="chip" [attr.aria-pressed]="assignee() === 'all'" (click)="setAssignee('all')">All</button>
+        </div>
+      }
+    </div>
+    <div class="chips" role="group" aria-label="Status">
+      <button type="button" class="chip" [attr.aria-pressed]="status() === null" (click)="setStatus(null)">All statuses</button>
+      @for (s of statuses; track s) {
+        <button type="button" class="chip" [attr.aria-pressed]="status() === s" (click)="setStatus(s)">{{ statusLabel[s] }}</button>
+      }
+    </div>
+
+    @if (claims(); as list) {
+      @if (list.length) {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Claim</th><th>Policy</th><th>Status</th><th>Incident</th><th class="r">Claimed</th><th>Submitted</th>
+                @if (session.isStaff()) { <th>Claimant</th><th>Officer</th> }
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of list; track c.id) {
+                <tr class="link" (click)="open(c)" (keydown.enter)="open(c)" tabindex="0">
+                  <td><strong>{{ c.claimNumber }}</strong></td>
+                  <td>{{ c.policy.market }} · {{ c.policy.product }}<div class="muted small mono">{{ c.policy.policyNumber }}</div></td>
+                  <td><app-status-pill [status]="c.status" /></td>
+                  <td class="num">{{ c.incidentDate | day }}</td>
+                  <td class="r num">{{ c.claimedAmount | money: c.currency }}</td>
+                  <td class="num">{{ c.submittedAt | day }}</td>
+                  @if (session.isStaff()) {
+                    <td>{{ c.claimant.displayName }}</td>
+                    <td>{{ c.assignedOfficer?.displayName ?? 'Unassigned' }}</td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="empty">No claims match this filter.</div>
+      }
+    } @else if (!problem()) {
+      <div class="skeleton">Loading claims…</div>
+    }
+  </section>
+</main>

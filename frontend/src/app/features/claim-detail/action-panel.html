@@ -1,0 +1,103 @@
+<section class="card">
+  <div class="eyebrow">Next actions · from the API</div>
+  @if (buttons().length) {
+    <div class="row">
+      @for (b of buttons(); track b.key) {
+        <button type="button" class="btn" [class.ghost]="active() !== null && active() !== b.key"
+                [attr.aria-expanded]="b.instant ? null : active() === b.key" [disabled]="busy()" (click)="press(b)">
+          {{ b.label }}
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="empty">{{ me().role === 'CLAIMANT' ? 'Nothing needed from you right now. Updates appear here.' : 'No actions available to you on this claim.' }}</div>
+  }
+
+  @switch (active()) {
+    @case ('assign') {
+      <form class="inline" (ngSubmit)="execute('assign')">
+        <div class="field"><label for="officer">Assign to officer</label>
+          <select id="officer" class="select" name="officer" [(ngModel)]="officerId" required>
+            @for (o of officers(); track o.id) { <option [value]="o.id">{{ o.displayName }}</option> }
+          </select></div>
+        <button class="btn small" type="submit" [disabled]="busy() || !officerId()">Assign</button>
+      </form>
+    }
+    @case ('reassign') {
+      <form class="inline" (ngSubmit)="execute('reassign')">
+        <div class="field"><label for="reofficer">Move to officer</label>
+          <select id="reofficer" class="select" name="reofficer" [(ngModel)]="officerId" required>
+            @for (o of assignableOfficers(); track o.id) { <option [value]="o.id">{{ o.displayName }}</option> }
+          </select></div>
+        <div class="small muted">Status stays {{ claim().status }}; the previous officer loses edit access.</div>
+        <button class="btn small" type="submit" [disabled]="busy() || !officerId()">Reassign</button>
+      </form>
+    }
+    @case ('requestInfo') {
+      <form class="inline" (ngSubmit)="execute('requestInfo')">
+        <div class="field"><label for="q">Question for the claimant</label>
+          <textarea id="q" class="textarea" name="q" [(ngModel)]="text" maxlength="2000" required
+                    placeholder="e.g. Please upload the police report"></textarea></div>
+        <button class="btn small" type="submit" [disabled]="busy() || !text().trim()">Send request</button>
+      </form>
+    }
+    @case ('respond') {
+      <form class="inline" (ngSubmit)="execute('respond')">
+        @if (openRequest(); as r) { <div class="quote">“{{ r.question }}”</div> }
+        <div class="field"><label for="resp">Your answer</label>
+          <textarea id="resp" class="textarea" name="resp" [(ngModel)]="text" maxlength="4000" required></textarea></div>
+        <button class="btn small" type="submit" [disabled]="busy() || !text().trim()">Send answer</button>
+      </form>
+    }
+    @case ('reserve') {
+      <form class="inline" (ngSubmit)="execute('reserve')">
+        <div class="two">
+          <div class="field"><label for="ramt">New reserve ({{ claim().currency }})</label>
+            <input id="ramt" class="input num" type="number" min="0" step="0.01" name="ramt" [(ngModel)]="amount" required /></div>
+          <div class="field"><label for="rreason">Reason</label>
+            <input id="rreason" class="input" name="rreason" [(ngModel)]="reason" maxlength="500" required placeholder="e.g. Repair quote received" /></div>
+        </div>
+        <div class="small muted">Current {{ claim().reserveAmount | money: claim().currency }} · internal estimate, never shown to the claimant.</div>
+        <button class="btn small" type="submit" [disabled]="busy() || amount() === null || !reason().trim()">Save reserve</button>
+      </form>
+    }
+    @case ('decide') {
+      <form class="inline" (ngSubmit)="execute('decide')">
+        <div class="chips" role="radiogroup" aria-label="Outcome">
+          @if (canApprove()) { <button type="button" class="chip" [attr.aria-pressed]="outcome() === 'APPROVED'" (click)="outcome.set('APPROVED')">Approve</button> }
+          @if (canReject()) { <button type="button" class="chip" [attr.aria-pressed]="outcome() === 'REJECTED'" (click)="outcome.set('REJECTED')">Reject</button> }
+        </div>
+        <div class="two">
+          @if (outcome() === 'APPROVED') {
+            <div class="field"><label for="damt">Approved amount ({{ claim().currency }})</label>
+              <input id="damt" class="input num" type="number" min="0.01" step="0.01" name="damt" [(ngModel)]="amount" required /></div>
+          }
+          <div class="field"><label for="dreason">Reason (visible to the claimant)</label>
+            <input id="dreason" class="input" name="dreason" [(ngModel)]="reason" maxlength="1000" required /></div>
+        </div>
+        <button class="btn small" type="submit"
+                [disabled]="busy() || !reason().trim() || (outcome() === 'APPROVED' && !amount())">
+          {{ outcome() === 'APPROVED' ? 'Approve claim' : 'Reject claim' }}
+        </button>
+      </form>
+    }
+    @case ('settle') {
+      <form class="inline" (ngSubmit)="execute('settle')">
+        <div class="field"><label for="samt">Amount paid ({{ claim().currency }})</label>
+          <input id="samt" class="input num" type="number" min="0.01" step="0.01" name="samt" [(ngModel)]="amount" required /></div>
+        <div class="small muted">Approved {{ claim().decision?.approvedAmount | money: claim().currency }}. Settling releases the reserve and closes the claim.</div>
+        <button class="btn small" type="submit" [disabled]="busy() || !amount()">Record settlement</button>
+      </form>
+    }
+    @case ('note') {
+      <form class="inline" (ngSubmit)="execute('note')">
+        <div class="field"><label for="note">Internal note (staff only)</label>
+          <textarea id="note" class="textarea" name="note" [(ngModel)]="text" maxlength="4000" required></textarea></div>
+        <button class="btn small" type="submit" [disabled]="busy() || !text().trim()">Add note</button>
+      </form>
+    }
+  }
+
+  @if (flash(); as f) { <div class="flash mono">{{ f }}</div> }
+  <app-problem-alert [problem]="problem()" [dismissible]="true" (dismissed)="problem.set(null)" />
+</section>

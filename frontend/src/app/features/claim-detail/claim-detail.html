@@ -1,0 +1,113 @@
+<main class="page">
+  <a routerLink="/claims" class="small">← Back to claims</a>
+
+  @if (problem(); as p) {
+    <section class="card missing">
+      <div class="big num">{{ p.status }}</div>
+      <div class="card-title">{{ p.status === 404 ? 'Claim not found' : 'Could not load this claim' }}</div>
+      <app-problem-alert [problem]="p" />
+      @if (p.status === 404 && session.isClaimant()) {
+        <p class="small muted">Claimants can only open their own claims. Another claimant’s claim is reported as
+          “not found” so its existence isn’t revealed.</p>
+      }
+    </section>
+  } @else if (claim(); as c) {
+    <div class="bento">
+      <!-- column 1: the claim -->
+      <div class="stack">
+        <section class="card accent">
+          <div class="spread">
+            <div>
+              <div class="small muted">{{ c.policy.market }} · {{ c.policy.product }} · {{ c.policy.policyNumber }}</div>
+              <h1 class="claim-no">{{ c.claimNumber }}</h1>
+            </div>
+            <app-status-pill [status]="c.status" />
+          </div>
+          <div>
+            <div class="small muted">Amount claimed</div>
+            <div class="amount num">{{ c.claimedAmount | money: c.currency }}</div>
+          </div>
+          <p class="desc">{{ c.description }}</p>
+          <div class="row">
+            <div class="kv"><div class="k">Incident</div><div class="v">{{ c.incidentDate | day }}</div></div>
+            <div class="kv"><div class="k">Submitted</div><div class="v">{{ c.submittedAt | day }}</div></div>
+            @if (session.isStaff()) {
+              <div class="kv"><div class="k">Officer</div><div class="v">{{ c.assignedOfficer?.displayName ?? 'Unassigned' }}</div></div>
+              <div class="kv"><div class="k">Reserve</div><div class="v">{{ c.reserveAmount | money: c.currency }}</div></div>
+            }
+            @if (c.settledAmount) {
+              <div class="kv"><div class="k">Settled</div><div class="v">{{ c.settledAmount | money: c.currency }}</div></div>
+            }
+            <div class="kv"><div class="k">Claim version</div><div class="v mono">v{{ c.version }}</div></div>
+          </div>
+        </section>
+
+        @if (c.decision; as d) {
+          <section class="card">
+            <div class="spread">
+              <h2 class="card-title">Decision</h2>
+              <span class="pill" [class.dark]="d.outcome === 'APPROVED'">{{ d.outcome === 'APPROVED' ? 'Approved' : 'Rejected' }}</span>
+            </div>
+            @if (d.approvedAmount) { <div class="amount-sm num">{{ d.approvedAmount | money: c.currency }}</div> }
+            <div>{{ d.reason }}</div>
+            <div class="small muted">{{ d.decidedBy.displayName }} · {{ d.decidedAt | when }}</div>
+          </section>
+        }
+      </div>
+
+      <!-- column 2: what to do + conversation -->
+      <div class="stack">
+        @if (session.me(); as me) {
+          <app-action-panel [claim]="c" [me]="me" [officers]="officers()" (updated)="onUpdated($event)" />
+        }
+
+        <section class="card">
+          <h2 class="card-title">Information requests</h2>
+          @for (r of c.infoRequests; track r.id) {
+            <article class="qa" [class.open]="r.open">
+              <div class="spread"><strong class="small">{{ r.requestedBy.displayName }} asked</strong>
+                <span class="pill" [class.lime]="r.open">{{ r.open ? 'Awaiting answer' : 'Answered' }}</span></div>
+              <div>{{ r.question }}</div>
+              @if (!r.open) { <div class="answer">{{ r.response }}<div class="small muted">{{ r.respondedAt | when }}</div></div> }
+            </article>
+          } @empty {
+            <div class="empty">No information has been requested.</div>
+          }
+        </section>
+
+        @if (c.notes; as notes) {
+          <section class="card">
+            <div class="spread"><h2 class="card-title">Internal notes</h2><span class="pill dark">Staff only</span></div>
+            @for (n of notes; track n.id) {
+              <article class="note-item"><div>{{ n.body }}</div><div class="small muted">{{ n.author.displayName }} · {{ n.createdAt | when }}</div></article>
+            } @empty { <div class="empty">No notes yet.</div> }
+          </section>
+        }
+      </div>
+
+      <!-- column 3: history -->
+      <div class="stack">
+        <app-timeline-card [claimId]="c.id" [claimVersion]="c.version" [staffView]="session.isStaff()" />
+
+        @if (c.reserveHistory; as history) {
+          <section class="card">
+            <div class="spread"><h2 class="card-title">Reserve history</h2><span class="pill dark">Staff only</span></div>
+            @if (history.length) {
+              <table class="table">
+                <thead><tr><th>When</th><th class="r">From</th><th class="r">To</th><th>Reason</th></tr></thead>
+                <tbody>
+                  @for (h of history; track $index) {
+                    <tr><td class="num small">{{ h.changedAt | when }}</td><td class="r num">{{ h.previousAmount | money: c.currency }}</td>
+                      <td class="r num">{{ h.newAmount | money: c.currency }}</td><td class="small">{{ h.reason }}</td></tr>
+                  }
+                </tbody>
+              </table>
+            } @else { <div class="empty">No reserve set yet.</div> }
+          </section>
+        }
+      </div>
+    </div>
+  } @else {
+    <div class="skeleton">Loading claim…</div>
+  }
+</main>

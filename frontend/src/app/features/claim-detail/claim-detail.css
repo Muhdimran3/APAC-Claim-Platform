@@ -1,0 +1,10 @@
+.claim-no { font-size: 38px; font-weight: 800; letter-spacing: -0.03em; margin-top: 4px; }
+.amount { font-size: 48px; font-weight: 400; letter-spacing: -0.03em; line-height: 1.05; }
+.amount-sm { font-size: 28px; letter-spacing: -0.02em; }
+.desc { margin: 0; font-size: 15px; opacity: 0.95; }
+.qa { display: grid; gap: 6px; padding: 12px; border-radius: 16px; background: var(--card-soft); }
+.qa.open { background: var(--lime-soft); }
+.answer { border-left: 3px solid var(--accent); padding-left: 10px; }
+.note-item { display: grid; gap: 2px; padding: 10px 12px; border-radius: 14px; background: var(--card-soft); }
+.missing { max-width: 640px; }
+.missing .big { font-size: 96px; font-weight: 800; color: var(--accent); line-height: 1; letter-spacing: -0.05em; }

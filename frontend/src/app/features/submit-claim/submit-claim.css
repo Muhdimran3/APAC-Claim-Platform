@@ -1,0 +1,8 @@
+.subtitle { margin-top: 10px; }
+.policies { display: grid; gap: 10px; }
+.policy { display: flex; flex-direction: column; gap: 6px; background: #fff; color: var(--ink); border-radius: 20px; padding: 14px 16px; cursor: pointer; border: 2px solid transparent; }
+.policy.selected { border-color: var(--lime); box-shadow: 0 0 0 3px rgba(216, 242, 75, 0.5); }
+.policy input { position: absolute; opacity: 0; pointer-events: none; }
+.policy:focus-within { outline: 3px solid var(--lime); }
+.policy .muted { color: var(--muted); }
+.on-accent { color: #fff; }
