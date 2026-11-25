@@ -52,7 +52,9 @@ These environment variables override the local defaults in `backend/src/main/res
 
 ## Architecture (summary)
 
-Modular monolith: one deployable with package-per-module (`claim`, `workload`, `exposure`).
+Full blueprint: see **Entry 3 – Architecture Summary** in [AI_JOURNAL.md](AI_JOURNAL.md).
+
+Modular monolith: one deployable with package-per-module (`claim`, `workload`, `exposure`, `timeline`).
 - **REST**: commands and queries where the caller needs an immediate answer or validation (submit, assign, transition, decide, list).
 - **Kafka (`claim-events`, keyed by claimId)**: lifecycle events consumed by the workload and exposure read models. Modules share only the event contracts, so they can be split into services later.
 - **Flyway** owns the schema, and Hibernate only validates it.
