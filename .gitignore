@@ -1,0 +1,15 @@
+target/
+build/
+out/
+dist/
+node_modules/
+.angular/cache/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.iml
+.DS_Store
+.env
+.env.local
+data/
