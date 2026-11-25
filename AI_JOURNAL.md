@@ -262,3 +262,12 @@ Real authentication/IdP, document uploads, approval authority limits, FX convers
   - `npm run build`: clean, no warnings, no budget breaches.
   - `ng test`: **29 Vitest tests pass**, covering the interceptor (header, follows selection, no role in body), problem parsing, money formatting, action-button rules per role/assignment, attention rules, per-currency exposure bars, and the problem alert rendering field errors.
   - With the backend on compose and `ng serve`: the page title is right, `/api/me` resolves through the proxy (maya → MANAGER), an unknown user gets 401, and an officer requesting exposure gets 403.
+
+### Entry 9 - Testing guide (`docs/TESTING.md`)
+- **Prompt / Direction:** "Write a md file to do unit testing end to end."
+- **Built:** `docs/TESTING.md`, covering five levels: backend unit (105), backend integration with Testcontainers (155 total), frontend Vitest (31), a copy-paste PowerShell **API end-to-end script** (31 checks across all roles and error codes, then waits for the Kafka read models), and an 18-step UI walkthrough. Also an optional "rebuild a read model from Kafka" procedure.
+- **Verified rather than assumed:** ran the unit-only Maven command (105 pass, no containers started). Extracted the e2e script from the markdown exactly as written and ran it against the live backend (31/31 pass).
+- **Challenged / corrected:**
+  - The script's first run reported 2 failures. They came from the AI's assertion helper comparing `1000.00` with `1000` as text, not from the API. Fixed to compare numbers by value.
+  - Dropped an untested "works in PowerShell 7" claim (PS 7 isn't installed).
+- **Not verified:** the read-model rebuild steps (4.3) need the backend stopped, and the user's own backend instance was running, so they weren't executed.

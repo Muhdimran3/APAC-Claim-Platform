@@ -49,6 +49,8 @@ Pick a demo user in the top-right switcher (sent as the `X-User` header): `alice
 
 ## Test
 
+Full guide (unit → integration → API end-to-end script → UI walkthrough): [docs/TESTING.md](docs/TESTING.md).
+
 ```powershell
 cd backend
 .\mvnw.cmd verify    # uses Testcontainers (own Postgres + Kafka), so compose doesn't need to be running
