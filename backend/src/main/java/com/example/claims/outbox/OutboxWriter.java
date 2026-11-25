@@ -1,10 +1,10 @@
 package com.example.claims.outbox;
 
 import com.example.claims.common.events.ClaimEvent;
+import com.example.claims.common.events.ClaimEventCodec;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Writes an event to the outbox table. MANDATORY propagation means this fails fast unless
@@ -15,11 +15,11 @@ import tools.jackson.databind.json.JsonMapper;
 public class OutboxWriter {
 
     private final OutboxRepository repository;
-    private final JsonMapper jsonMapper;
+    private final ClaimEventCodec codec;
 
-    public OutboxWriter(OutboxRepository repository, JsonMapper jsonMapper) {
+    public OutboxWriter(OutboxRepository repository, ClaimEventCodec codec) {
         this.repository = repository;
-        this.jsonMapper = jsonMapper;
+        this.codec = codec;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -28,7 +28,7 @@ public class OutboxWriter {
                 event.eventId(),
                 event.claimId(),
                 event.eventType().wireName(),
-                jsonMapper.writeValueAsString(event),
+                codec.write(event),
                 event.occurredAt()));
     }
 }

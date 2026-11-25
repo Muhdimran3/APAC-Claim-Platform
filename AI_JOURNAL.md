@@ -197,3 +197,38 @@ Real authentication/IdP, document uploads, approval authority limits, FX convers
     - outbox 4 (Postgres + real Kafka)
     - schema 7 and context 1
   - Manual smoke test on the docker-compose stack, with the scheduled poller on: submitted and assigned a claim over HTTP, both outbox rows marked published, and both messages are on `claim-events` keyed by claimId.
+
+### Entry 6 - Step 4: Kafka projections and read endpoints
+- **Prompt / Direction:** Three consumers (workload, exposure, timeline) on `claim-events` with separate groups, reading only events and deduplicating by per-claim version. Exposure totals by query. Dashboard and timeline endpoints with consistent `X-User` role rules. Tests for idempotency and the endpoints.
+- **Built:**
+  - `common.events.ClaimEventCodec`: single JSON codec used by the outbox writer and all consumers. Amounts in `details` parse as BigDecimal. A corrupt or unknown message is logged and **skipped** (returns empty), because retrying a poison message would block every later event on that partition.
+  - `KafkaConsumerConfig`: `DefaultErrorHandler` retries transient failures (e.g. DB down) 5× at 1 s, then logs and moves on. No dead-letter topic (out of scope, Entry 3 G).
+  - `workload`, `exposure`, `timeline` packages each have a `…Projection` (`@KafkaListener`, own `groupId`), a JDBC repository, and a controller.
+  - `V5__timeline_claimant.sql` adds `claimant_id` to timeline rows (from the event snapshot), so the timeline can authorise claimants without reading claim tables.
+  - Endpoints:
+    - `GET /api/dashboard/workload` (staff): officers see their own row, managers see every officer, including those with zero claims. Both see the unassigned queue. Figures: open by status, aged (>14 days open), oldest open, closed in the last 30 days, and average days to close.
+    - `GET /api/dashboard/exposure` (managers only): outstanding reserve on open claims per currency (never summed across currencies), a market/product breakdown, and a count of open claims with no reserve yet ("unestimated exposure").
+    - `GET /api/claims/{id}/timeline`: staff see every entry. Claimants see only claimant-visible entries for their own claims; reserve changes are staff-only.
+- **Key decisions:**
+  - **Dedupe is a single SQL statement:** `INSERT … ON CONFLICT (claim_id) DO UPDATE … WHERE last_claim_version < EXCLUDED.last_claim_version`. The check and the write are atomic, so there's no read-then-write race, and a duplicate or stale event updates 0 rows.
+  - **"Newest version wins" is correct because events carry the full snapshot.** Skipping an older event loses nothing, so even out-of-order delivery (e.g. the multi-instance poller caveat from Entry 5) converges to the right state.
+  - **Timeline dedupes on `eventId`, not version.** A timeline wants every event, so the PK on `event_id` plus `ON CONFLICT DO NOTHING` makes redelivery a no-op.
+  - **Exposure is `SUM(reserve_amount) WHERE is_open GROUP BY …` over one row per claim.** A redelivered event overwrites a row (or does nothing); it never adds, so double counting is impossible. A settled or rejected claim can't come back through a stale event (tested).
+  - **Repositories use JdbcTemplate, not JPA.** The upserts are SQL-specific, and the read models are simple tables with no aggregate behaviour.
+  - **A claimant asking for someone else's timeline gets an empty list,** the same as for a claim with no events yet. This keeps the timeline independent of the claim tables, reveals nothing, and avoids returning 404 in the moment between creating a claim and its first event being projected.
+  - **Rebuilding read models:** consumers start at `earliest`. To rebuild, truncate a projection table and reset its group's offsets. Verified on compose: the new consumers replayed Step 3's messages into correct rows.
+- **Challenged / corrected during the build:**
+  - The workload stats query failed: Postgres 14+ `EXTRACT(EPOCH …)` returns `numeric`, and pgjdbc won't convert `numeric` with `getObject(Double.class)`. Cast to `double precision` in SQL. The bug also made the end-to-end test time out, because the workload endpoint returned 500.
+  - A literal `null` message would have NPE'd in the codec. Guarded and tested.
+  - AI made the JDBC repositories `@Repository` (which adds a proxy) with package-private records exposed in public responses. Switched to `@Component` (JdbcTemplate already translates exceptions) and made the response records public.
+  - AI wrote a meaningless assertion (`everyItem(not(is(-1)))` on counts) in the end-to-end test. Replaced it with a real check.
+- **Known limits:**
+  - Dashboards are eventually consistent (typically <1 s locally) and don't report projection lag.
+  - Officer display names come from `app_user` (reference data). In a split-out service that would be an identity lookup.
+  - Ordering of timeline entries with an identical `occurred_at` falls back to `event_id`. In practice each command has its own timestamp.
+- **Verified:**
+  - `mvnw verify` passes **155 tests, 0 failures**. New in this step:
+    - codec 3, timeline summaries 11, currency totals 2 (unit)
+    - workload 5, exposure 4, timeline 2 (Postgres, synthetic duplicate/stale/replayed events)
+    - end-to-end 2: REST → outbox → poller → Kafka → three groups → endpoints, plus role checks
+  - Smoke test on compose: V5 applied, three groups each got all 3 partitions, and the dashboards and timeline returned correct data built by replay.
