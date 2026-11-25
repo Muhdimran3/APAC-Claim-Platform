@@ -31,6 +31,21 @@ describe('toProblem', () => {
     expect(p.detail).toContain('localhost:8080');
   });
 
+  it('treats the dev proxy’s empty 500 (backend down, ECONNREFUSED) as unreachable', () => {
+    const p = toProblem(new HttpErrorResponse({ status: 500, error: null, url: '/api/me' }));
+    expect(p.status).toBe(0);
+    expect(p.title).toBe('Backend unreachable');
+    expect(p.detail).toContain('mvnw.cmd spring-boot:run');
+  });
+
+  it('still reports a genuine backend 500, which has a problem body', () => {
+    const p = toProblem(new HttpErrorResponse({
+      status: 500, error: { title: 'Internal Server Error', status: 500, detail: 'Unexpected failure' },
+    }));
+    expect(p.status).toBe(500);
+    expect(p.title).toBe('Internal Server Error');
+  });
+
   it('falls back to a standard title when the body is not JSON', () => {
     const p = toProblem(new HttpErrorResponse({ status: 403, error: '<html>' }));
     expect(p.title).toBe('Forbidden');

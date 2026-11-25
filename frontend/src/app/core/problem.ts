@@ -26,11 +26,12 @@ export function toProblem(error: unknown): Problem {
   if (!(error instanceof HttpErrorResponse)) {
     return { status: -1, title: 'Unexpected error', detail: String(error), errors: {} };
   }
-  if (error.status === 0) {
+  if (error.status === 0 || isDevProxyFailure(error)) {
     return {
       status: 0,
       title: FALLBACK_TITLES[0],
-      detail: 'No response from the API. Is the backend running on http://localhost:8080?',
+      detail: 'No response from the API. Is the backend running on http://localhost:8080? '
+        + 'Start it with: cd backend; .\\mvnw.cmd spring-boot:run',
       errors: {},
     };
   }
@@ -43,6 +44,18 @@ export function toProblem(error: unknown): Problem {
     detail: typeof body.detail === 'string' ? body.detail : error.message,
     errors,
   };
+}
+
+/**
+ * When the backend is down, the dev-server proxy answers with a bare 5xx and no body (the
+ * terminal shows ECONNREFUSED). A real backend error always carries an RFC 7807 JSON body
+ * with a title, so the two can be told apart reliably.
+ */
+function isDevProxyFailure(error: HttpErrorResponse): boolean {
+  if (error.status < 500 || error.status > 504) return false;
+  const body = error.error;
+  return body === null || body === undefined || body === '' ||
+    (typeof body === 'object' && !('title' in body) && !('detail' in body));
 }
 
 /** One-line hint per status so users know what kind of failure it was. */
